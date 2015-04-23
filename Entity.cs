@@ -4,7 +4,6 @@ using System.Linq;
 using System.Text;
 using Microsoft.Xna.Framework;
 using System.Diagnostics;
-using Wintellect.PowerCollections;
 using System.Collections;
 
 
@@ -15,6 +14,7 @@ namespace City_Builder
     {
         Queue<Tile> path = new Queue<Tile>();
         Random rand = new Random();
+        string[] buildings = new string[] { "Quarry", "Logging Camp", "Wheat", "Rye", "Corn", "Potato", "Strawberry" }; 
 
         Tile destination;
         int danceIndex = 0;
@@ -37,7 +37,7 @@ namespace City_Builder
             this.destination = parent.getTile(coords);
             this.setSpriteRectangle(new Rectangle(64, 0, 16, 20));
             this.contructInfo();
-            currentAction = "Idle";
+            currentAction = "Dance";
 
             choiceTree.Add("Root", new string[] { "Move", "Build", "Idle", "Dance" });
             choiceTree.Add("Build", new string[] { "Quarry", "Logging Camp", "Farm" });
@@ -70,8 +70,6 @@ namespace City_Builder
                 openSet.Dequeue();
                 path.Enqueue(current);
 
-                Debug.Print(Convert.ToString(openSet.Size()));
-
                 //!parent.getTile(current[0] + 1, current[1]).getTag().Equals("hill")
             }
 
@@ -87,7 +85,7 @@ namespace City_Builder
 
         public void update(GameTime gameTime)
         {
-            Debug.Print(currentAction);
+            //Debug.Print(currentAction);
             this.contructInfo();
             danceTimer += gameTime.ElapsedGameTime.Milliseconds;
             moveTimer += gameTime.ElapsedGameTime.Milliseconds;
@@ -132,13 +130,16 @@ namespace City_Builder
             }
         }
 
+        public override void checkStateChange()
+        {
+            if (buildings.Contains(currentAction)) { parent.startBuilding(currentAction); currentAction = "Nothing"; }
+        }
+
         public void move()
         {
-            Debug.Print(Convert.ToString(moveTimer));
             if (moveTimer > 225)
             //&& !parent.tileOccupied(path.Peek()[0],path.Peek()[1])
             {
-                Debug.Print("get here?");
                 moveTimer = 0;
                 if (parent.tileExists(path.Peek().getCoords()[0], path.Peek().getCoords()[1]))
                 {
@@ -150,18 +151,41 @@ namespace City_Builder
         }
         public void contructInfo()
         {
-
             this.info = "";
             this.info += "Current Action: " + currentAction + "\n";
-            this.info += "Happiness:\n" + "[" + String.Concat(Enumerable.Repeat((char)216, happiness)) + "\n";
-            this.info += "Wood Cutting:\n" + "[" + String.Concat(Enumerable.Repeat((char)216, woodCutting)) + "\n";
-            this.info += "Mining:\n" + "[" + String.Concat(Enumerable.Repeat((char)216, mining)) + "\n";
-            this.info += "Farming:\n" + "[" + String.Concat(Enumerable.Repeat((char)216, farming)) + "\n";
+            this.info += "Happiness:                 Mining:\n" + "[" + String.Concat(Enumerable.Repeat((char)216, happiness)) + String.Concat(Enumerable.Repeat(" ", 20 - happiness)) + "]" + "     ";
+            this.info += "[" + String.Concat(Enumerable.Repeat((char)216, mining)) + String.Concat(Enumerable.Repeat(" ", 20 - mining)) + "]" + "\n";
+            this.info += "Wood Cutting:              Farming:\n" + "[" + String.Concat(Enumerable.Repeat((char)216, woodCutting)) + String.Concat(Enumerable.Repeat(" ", 20 - woodCutting)) + "]" + "     ";
+            this.info += "[" + String.Concat(Enumerable.Repeat((char)216, farming)) + String.Concat(Enumerable.Repeat(" ", 20 - farming)) + "]";
+            
         }
         public override string getInfo()
         {
             this.contructInfo();
             return base.getInfo();
+        }
+    }
+    class Structure : Selectable
+    {
+        public Structure(int[] coords, string inTag, Scene scene)
+        {
+            this.parent = scene;
+            this.tag = inTag;
+            this.coords = coords;
+            this.setSpriteRectangle(new Rectangle(0, 220, 80, 100));
+            this.options = choiceTree["Root"];
+        }
+        public void update(GameTime gameTime) { }
+
+        public override string getInfo()
+        {
+            this.contructInfo();
+            return base.getInfo();
+        }
+        public void contructInfo()
+        {
+            this.info = "";
+         
         }
     }
     class City : Selectable
@@ -193,6 +217,7 @@ namespace City_Builder
 
         public string[] getOptions() { return options; }
         public void setIndex(string index) { if (choiceTree.ContainsKey(index)) { this.options = choiceTree[index]; } }
+        public virtual void checkStateChange() { }
         public void setAction(string action) { this.currentAction = action; }
         public bool hasChildren(string key) { return choiceTree.ContainsKey(key); }
         public void reset() { this.options = choiceTree["Root"]; }
@@ -312,6 +337,7 @@ namespace City_Builder
  * Current Action:  whatever
  * HAPPINESS:                               WOOD:             PICTURE_____
  *[XXXXXXXXXXX]                            [XXXXXXXXXXXX]           /     \
- * MINING:                                  FARMING:                | ' ' |
- *[XXXXXXXXXXX]                            [XXXXXXXXXXXX]
-*/
+ * MINING:                                  FARMING:                | 0 0 |
+ *[XXXXXXXXXXX]                            [XXXXXXXXXXXX]           \ --- /
+ *                                                                   VVVVV       
+*/                                                                    

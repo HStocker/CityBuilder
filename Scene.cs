@@ -18,6 +18,7 @@ namespace City_Builder
         List<Unit> units = new List<Unit>();
         UI ui;
         Cursor cursor;
+        Cursor buildCursor;
         KeyboardState state;
 
         //pixels
@@ -47,6 +48,7 @@ namespace City_Builder
         bool pause = false;
         string controller = "moving";
         string currentIndex = "Root";
+        string buildAction;
         Stack<string> selectionStack = new Stack<string>();
 
         //XNA contructs and components
@@ -78,7 +80,7 @@ namespace City_Builder
             output18 = ingame.Content.Load<SpriteFont>("Output18pt");
             output12 = ingame.Content.Load<SpriteFont>("Output12pt");
 
-            menu = new ingameMenu(ingame, output18);
+            menu = new ingameMenu(ingame, output12);
 
             screenHeight = ingame.GraphicsDevice.Viewport.Height;
             screenWidth = ingame.GraphicsDevice.Viewport.Width;
@@ -117,6 +119,7 @@ namespace City_Builder
                 case "selecting": { this.selecting(); break; }
                 case "escaped": { this.escaped(); break; }
                 case "paused": { this.paused(); break; }
+                case "building": { this.building();  break; }
                 //760,0,240,800
             }
         }
@@ -133,16 +136,35 @@ namespace City_Builder
             {
                 //draw Cursor
                 //Debug.Print("cursor: " + Convert.ToString(cursor.coords[0]) + "," + Convert.ToString(cursor.coords[1]));
-                spriteBatch.Draw(spriteSheet,
-                    new Rectangle(cursor.coords[0] * tileWidth, cursor.coords[1] * tileHeight, 16, 20),
-                    cursor.getSpriteRectangle(), Color.White);
-                //draw UI
-                spriteBatch.Draw(spriteSheet, ui.getLocationRectangle(), ui.getSpriteRectangle(), Color.White);
-
+                if(controller.Equals("paused"))
+                {
+                    spriteBatch.Draw(spriteSheet,
+                        new Rectangle(cursor.coords[0] * tileWidth, cursor.coords[1] * tileHeight, 16, 20),
+                        cursor.getSpriteRectangle(), Color.White);
+                }
                 //while hovering over
-                if (pause && selection != null)
+                if (selection != null)
                 {
                     spriteBatch.DrawString(output18, selection.getTag(), ui.getSlot(0), Color.Black);
+
+                    if (controller.Equals("building"))
+                    {
+                        if (isValidBuilding())
+                        {
+                            spriteBatch.Draw(spriteSheet,
+                                new Rectangle(buildCursor.coords[0] * tileWidth, buildCursor.coords[1] * tileHeight, tileWidth * buildCursor.getDimensions()[0], tileHeight * buildCursor.getDimensions()[1]),
+                                buildCursor.getSpriteRectangle(), Color.White);
+                        }
+                        else 
+                        {
+                            spriteBatch.Draw(spriteSheet,
+                                new Rectangle(buildCursor.coords[0] * tileWidth, buildCursor.coords[1] * tileHeight, tileWidth * buildCursor.getDimensions()[0], tileHeight * buildCursor.getDimensions()[1]),
+                                buildCursor.getInvalidRectangle(), Color.White);
+                        }
+                    }
+
+                    //draw UI
+                    spriteBatch.Draw(spriteSheet, ui.getLocationRectangle(), ui.getSpriteRectangle(), Color.White);
 
                     //selection game state updates
                     if (controller.Equals("selecting"))
@@ -158,15 +180,16 @@ namespace City_Builder
                             Texture2D dummyTexture = new Texture2D(ingame.GraphicsDevice, 1, 1);
                             Texture2D dummyTexture2 = new Texture2D(ingame.GraphicsDevice, 1, 1);
                             dummyTexture.SetData(new Color[] { Color.Gray });
-                            spriteBatch.Draw(dummyTexture, new Rectangle(130, 150, 900, 600), Color.Gray);
+                            spriteBatch.Draw(dummyTexture, new Rectangle(0, screenHeight - 220, screenWidth, screenHeight), Color.Gray);
                             dummyTexture2.SetData(new Color[] { Color.Black });
-                            spriteBatch.Draw(dummyTexture2, new Rectangle(145, 165, 870, 570), Color.Gray);
+                            spriteBatch.Draw(dummyTexture2, new Rectangle(15, screenHeight - 205, screenWidth - 30, screenHeight), Color.Black);
 
-                            spriteBatch.DrawString(output18, selection.getInfo(), new Vector2(225, 175), Color.White);
+                            spriteBatch.DrawString(output18, selection.getInfo(), new Vector2(20, screenHeight - 198), Color.White);
                         }
 
                     }
                 }
+
             }
 
             if (controller.Equals("escaped"))
@@ -312,7 +335,7 @@ namespace City_Builder
                     currentIndex = selection.getOptions()[selectIndex];
                     selection.setIndex(currentIndex);
                 }
-                else { selection.setAction(selection.getOptions()[selectIndex]); }
+                else { selection.setAction(selection.getOptions()[selectIndex]); selection.checkStateChange(); }
                 selectUpdate = 0;
             }
             else if (selectUpdate >= 128 && (state.IsKeyDown(Keys.Left) || state.IsKeyDown(Keys.A)))
@@ -331,8 +354,136 @@ namespace City_Builder
         }
         public void escaped()
         {
-            if (escapeUpdate >= 128 && state.IsKeyDown(Keys.Escape)) { escapeUpdate = 0; controller = "moving"; }
+            if (escapeUpdate >= 128 && state.IsKeyDown(Keys.Escape)) { escapeUpdate = 0; menu.clear(); controller = "moving"; }
         }
+        public void building()
+        {
+
+            if (moveUpdate >= 16 * framePerMove)
+            {
+
+                if (state.IsKeyDown(Keys.LeftShift) || state.IsKeyDown(Keys.RightShift)) { moveMod = 10; }
+                else { moveMod = 1; }
+
+                if (state.IsKeyDown(Keys.W) || state.IsKeyDown(Keys.Up))
+                {
+                    buildCursor.coords[1] -= moveMod;
+                    if (buildCursor.coords[1] <= 0 && currentCorner[1] != 0)
+                    { currentCorner[1] -= 10; buildCursor.coords[1] += 10; };
+                    if (buildCursor.coords[1] < 0)
+                    { buildCursor.coords[1] = 0; };
+                    moveUpdate = 0;
+                    if (currentCorner[1] < 0) { currentCorner[1] = 0; }
+                }
+                if (state.IsKeyDown(Keys.A) || state.IsKeyDown(Keys.Left))
+                {
+                    buildCursor.coords[0] -= moveMod;
+                    if (buildCursor.coords[0] <= 0 && currentCorner[0] != 0)
+                    { currentCorner[0] -= 10; buildCursor.coords[0] += 10; };
+                    if (buildCursor.coords[0] < 0)
+                    { buildCursor.coords[0] = 0; };
+                    moveUpdate = 0;
+                    if (currentCorner[0] < 0) { currentCorner[0] = 0; }
+                }
+                if (state.IsKeyDown(Keys.D) || state.IsKeyDown(Keys.Right))
+                {
+                    buildCursor.coords[0] += moveMod;
+                    if (buildCursor.coords[0] >= screenTileWidth - 1 && currentCorner[0] != constructor.getDimensions()[0] - screenTileWidth)
+                    { currentCorner[0] += 10; buildCursor.coords[0] -= 10; };
+                    if (buildCursor.coords[0] > screenTileWidth - 1)
+                    { buildCursor.coords[0] = screenTileWidth - 1; };
+                    moveUpdate = 0;
+                    if (currentCorner[0] > constructor.getDimensions()[0] - screenTileWidth) { currentCorner[0] = constructor.getDimensions()[0] - screenTileWidth; }
+
+                }
+                if (state.IsKeyDown(Keys.S) || state.IsKeyDown(Keys.Down))
+                {
+                    buildCursor.coords[1] += moveMod;
+                    if (buildCursor.coords[1] >= screenTileHeight - 1 && currentCorner[1] != constructor.getDimensions()[1] - screenTileHeight)
+                    { currentCorner[1] += 10; buildCursor.coords[1] -= 10; };
+                    if (buildCursor.coords[1] > screenTileHeight - 1)
+                    { buildCursor.coords[1] = screenTileHeight - 1; };
+                    moveUpdate = 0;
+                    if (currentCorner[1] > constructor.getDimensions()[1] - screenTileHeight) { currentCorner[1] = constructor.getDimensions()[1] - screenTileHeight; }
+
+                }
+                if (state.IsKeyDown(Keys.Enter)) {  }
+                if (pauseUpdate >= 128 && state.IsKeyDown(Keys.Space)) { pauseUpdate = 0; this.togglePause(); controller = "moving"; }
+                if (escapeUpdate >= 128 && state.IsKeyDown(Keys.Escape)) { escapeUpdate = 0; controller = "selecting"; }
+            }
+        }
+
+
+        public void startBuilding(string build)
+        {
+            controller = "building";
+            buildAction = build;
+            buildCursor = new Cursor();
+
+            //!!!test building sprites
+            //change location and dimensions when you get around to building them
+            switch (build)
+            {
+                case "Quarry": 
+                    { 
+                        buildCursor.setSpriteRectangle(new Rectangle(128, 0, 47, 39));
+                        buildCursor.setInvalidRectangle(new Rectangle(175, 0, 47, 39));
+                        buildCursor.setDimensions(3, 2); 
+                        break; 
+                    }
+                case "Logging Camp":
+                    {
+                        buildCursor.setSpriteRectangle(new Rectangle(128, 0, 47, 39));
+                        buildCursor.setInvalidRectangle(new Rectangle(175, 0, 47, 39));
+                        buildCursor.setDimensions(3, 2);
+                        break;
+                    }
+                case "Wheat":
+                    {
+                        buildCursor.setSpriteRectangle(new Rectangle(128, 0, 47, 39));
+                        buildCursor.setInvalidRectangle(new Rectangle(175, 0, 47, 39));
+                        buildCursor.setDimensions(3, 2);
+                        break;
+                    }
+                case "Rye":
+                    {
+                        buildCursor.setSpriteRectangle(new Rectangle(128, 0, 47, 39));
+                        buildCursor.setInvalidRectangle(new Rectangle(175, 0, 47, 39));
+                        buildCursor.setDimensions(3, 2);
+                        break;
+                    }
+                case "Corn":
+                    {
+                        buildCursor.setSpriteRectangle(new Rectangle(128, 0, 47, 39));
+                        buildCursor.setInvalidRectangle(new Rectangle(175, 0, 47, 39));
+                        buildCursor.setDimensions(3, 2);
+                        break;
+                    }
+                default: { break; }
+            }
+        }
+        public bool isValidBuilding() 
+        {
+            bool val = true;
+            for (int i = 0; i < buildCursor.getDimensions()[0]; i++)
+            {
+                for (int j = 0; j < buildCursor.getDimensions()[1]; j++)
+                {
+                    Tile currentTile = constructor.getTile(buildCursor.coords[0] + i + currentCorner[0], buildCursor.coords[1] + j + currentCorner[1]);
+                    switch (buildAction)
+                    {
+                        case "Quarry": { if (currentTile.getTag().Equals("hill")) { return true; } else { val = false; } break; }
+                        case "Logging Camp": { if (currentTile.getTag().Equals("forest")) { return true; } else { val = false; } break; }
+                        case "Wheat": { if (currentTile.getTag().Equals("hill") || currentTile.getTag().Equals("forest") || currentTile.getTag().Equals("river")) { return false; } break; }
+                        case "Rye": { if (currentTile.getTag().Equals("hill") || currentTile.getTag().Equals("forest") || currentTile.getTag().Equals("river")) { return false; } break; }
+                        case "Corn": { if (currentTile.getTag().Equals("hill") || currentTile.getTag().Equals("forest") || currentTile.getTag().Equals("river")) { return false; } break; }
+
+                    }
+                }
+            }
+            return val;
+        }
+
         public Tile getTile(int x, int y) { return constructor.getTile(x, y); }
         public bool tileExists(int x, int y) { return constructor.includesTile(x,y); }
         public bool tileOccupied(int x, int y) { foreach (Unit unit in units) { if (unit.coords.Equals(new int[] { x, y })) { return true; } } return false; }
@@ -394,6 +545,7 @@ namespace City_Builder
                     int tileNumber = Convert.ToInt16(lineSplit[j]);
                     if (tileNumber > tileTypes.Length - 1 || tileNumber < 0) { tileNumber = 1; }
                     tileArray[j, i] = new Tile(tileNumber, tileTypes[tileNumber],j,i, rand);
+                    tileArray[j, i].setTag(tileTypes[tileNumber]);
                 }
             }
             this.connectWalls(rand);
@@ -491,16 +643,17 @@ namespace City_Builder
     }
     class Cursor : Drawable
     {
-
+        int[] dimensions;
+        Rectangle invalid;
         public Cursor()
         {
             this.setSpriteRectangle(new Rectangle(16, 20, 16, 20));
             setCoords(23, 20);
         }
-        public void update()
-        {
-
-        }
+        public void setDimensions(int x, int y) { dimensions = new int[] { x, y }; }
+        public int[] getDimensions() { if (dimensions != null) { return dimensions; } else { return new int[] { 0, 0 }; } }
+        public void setInvalidRectangle(Rectangle inval) { invalid = inval; }
+        public Rectangle getInvalidRectangle() { return invalid; }
     }
     class UI : Drawable
     {
