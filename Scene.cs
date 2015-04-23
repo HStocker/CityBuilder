@@ -16,6 +16,7 @@ namespace City_Builder
         Constructor constructor;
         List<City> blocks = new List<City>();
         List<Unit> units = new List<Unit>();
+        List<Structure> structures = new List<Structure>();
         UI ui;
         Cursor cursor;
         Cursor buildCursor;
@@ -53,6 +54,7 @@ namespace City_Builder
 
         //XNA contructs and components
         Selectable selection;
+        Unit selectedUnit;
         ingameMenu menu;
         SpriteBatch spriteBatch;
         City_Builder ingame;
@@ -114,6 +116,7 @@ namespace City_Builder
                         this.moving();
                         foreach (City block in blocks) { block.update(gameTime); }
                         foreach (Unit unit in units) { unit.update(gameTime); }
+                        foreach (Structure structure in structures) { structure.update(gameTime); }
                         break;
                     }
                 case "selecting": { this.selecting(); break; }
@@ -129,8 +132,9 @@ namespace City_Builder
             //DRAW tiles, blocks, units
             this.drawTiles();
             foreach (City block in blocks) { spriteBatch.Draw(spriteSheet, new Rectangle((block.coords[0] - currentCorner[0]) * tileWidth, (block.coords[1] - currentCorner[1]) * tileHeight, 80, 100), block.getSpriteRectangle(), Color.White); }
+            foreach (Structure structure in structures) { spriteBatch.Draw(spriteSheet, new Rectangle((structure.coords[0] - currentCorner[0]) * tileWidth, (structure.coords[1] - currentCorner[1]) * tileHeight, tileWidth * structure.getDimensions()[0], tileHeight * structure.getDimensions()[1]), structure.getSpriteRectangle(), Color.White); }
             foreach (Unit unit in units) { spriteBatch.Draw(spriteSheet, new Rectangle((unit.coords[0] - currentCorner[0]) * tileWidth, (unit.coords[1] - currentCorner[1]) * tileHeight, 16, 20), unit.getSpriteRectangle(), Color.White); }
-
+            
             //paused game state updates
             if (pause)
             {
@@ -142,6 +146,10 @@ namespace City_Builder
                         new Rectangle(cursor.coords[0] * tileWidth, cursor.coords[1] * tileHeight, 16, 20),
                         cursor.getSpriteRectangle(), Color.White);
                 }
+
+                //draw UI
+                spriteBatch.Draw(spriteSheet, ui.getLocationRectangle(), ui.getSpriteRectangle(), Color.White);
+
                 //while hovering over
                 if (selection != null)
                 {
@@ -163,8 +171,6 @@ namespace City_Builder
                         }
                     }
 
-                    //draw UI
-                    spriteBatch.Draw(spriteSheet, ui.getLocationRectangle(), ui.getSpriteRectangle(), Color.White);
 
                     //selection game state updates
                     if (controller.Equals("selecting"))
@@ -217,7 +223,7 @@ namespace City_Builder
         public void moving()
         {
 
-            //movement scheme for pause/unpaused playing states
+            //movement scheme for unpaused playing states
 
             if (moveUpdate >= 16 * framePerMove)
             {
@@ -249,7 +255,7 @@ namespace City_Builder
                 }
 
             }
-            //end movement for pause/unpause playing state
+            //end movement for unpause playing state
 
             //pause toggle
             if (pauseUpdate >= 192 && state.IsKeyDown(Keys.Space)) { this.togglePause(); controller = "paused"; }
@@ -388,10 +394,10 @@ namespace City_Builder
                 if (state.IsKeyDown(Keys.D) || state.IsKeyDown(Keys.Right))
                 {
                     buildCursor.coords[0] += moveMod;
-                    if (buildCursor.coords[0] >= screenTileWidth - 1 && currentCorner[0] != constructor.getDimensions()[0] - screenTileWidth)
+                    if (buildCursor.coords[0] >= screenTileWidth - buildCursor.getDimensions()[0] && currentCorner[0] != constructor.getDimensions()[0] - screenTileWidth)
                     { currentCorner[0] += 10; buildCursor.coords[0] -= 10; };
-                    if (buildCursor.coords[0] > screenTileWidth - 1)
-                    { buildCursor.coords[0] = screenTileWidth - 1; };
+                    if (buildCursor.coords[0] > screenTileWidth - buildCursor.getDimensions()[0])
+                    { buildCursor.coords[0] = screenTileWidth - buildCursor.getDimensions()[0]; };
                     moveUpdate = 0;
                     if (currentCorner[0] > constructor.getDimensions()[0] - screenTileWidth) { currentCorner[0] = constructor.getDimensions()[0] - screenTileWidth; }
 
@@ -399,26 +405,37 @@ namespace City_Builder
                 if (state.IsKeyDown(Keys.S) || state.IsKeyDown(Keys.Down))
                 {
                     buildCursor.coords[1] += moveMod;
-                    if (buildCursor.coords[1] >= screenTileHeight - 1 && currentCorner[1] != constructor.getDimensions()[1] - screenTileHeight)
+                    if (buildCursor.coords[1] >= screenTileHeight - buildCursor.getDimensions()[1] && currentCorner[1] != constructor.getDimensions()[1] - screenTileHeight)
                     { currentCorner[1] += 10; buildCursor.coords[1] -= 10; };
-                    if (buildCursor.coords[1] > screenTileHeight - 1)
-                    { buildCursor.coords[1] = screenTileHeight - 1; };
+                    if (buildCursor.coords[1] > screenTileHeight - buildCursor.getDimensions()[1])
+                    { buildCursor.coords[1] = screenTileHeight - buildCursor.getDimensions()[1]; };
                     moveUpdate = 0;
                     if (currentCorner[1] > constructor.getDimensions()[1] - screenTileHeight) { currentCorner[1] = constructor.getDimensions()[1] - screenTileHeight; }
 
                 }
-                if (state.IsKeyDown(Keys.Enter)) {  }
+                if (state.IsKeyDown(Keys.Enter)) 
+                { 
+                    structures.Add(new Structure(buildCursor.coords, buildCursor.getDimensions(), buildAction, this)); 
+                    controller = "moving";
+                    selectedUnit = (Unit)selection;
+                    selectedUnit.setAction("Move");
+                    selectedUnit.setDestination(buildCursor.coords[0], buildCursor.coords[1]);
+
+                    this.togglePause(); 
+                }
                 if (pauseUpdate >= 128 && state.IsKeyDown(Keys.Space)) { pauseUpdate = 0; this.togglePause(); controller = "moving"; }
                 if (escapeUpdate >= 128 && state.IsKeyDown(Keys.Escape)) { escapeUpdate = 0; controller = "selecting"; }
             }
         }
 
-
+        public bool validBuildSpot(int[] coordinate) { foreach (Structure structure in structures) { if (!structure.finished && coordinate[0] == structure.coords[0] && coordinate[1] == structure.coords[1]) { selectedUnit.setCurrentProject(structure); return true; } } return false; }
         public void startBuilding(string build)
         {
             controller = "building";
             buildAction = build;
             buildCursor = new Cursor();
+            //set to 0 in order to avoid recognition in the first few frames of building()
+            moveUpdate = 0;
 
             //!!!test building sprites
             //change location and dimensions when you get around to building them
@@ -464,24 +481,35 @@ namespace City_Builder
         }
         public bool isValidBuilding() 
         {
+            if (checkOverlap()) { return false; }
+
             bool val = true;
             for (int i = 0; i < buildCursor.getDimensions()[0]; i++)
             {
                 for (int j = 0; j < buildCursor.getDimensions()[1]; j++)
                 {
-                    Tile currentTile = constructor.getTile(buildCursor.coords[0] + i + currentCorner[0], buildCursor.coords[1] + j + currentCorner[1]);
-                    switch (buildAction)
+                    if (tileExists(buildCursor.coords[0] + i + currentCorner[0], buildCursor.coords[1] + j + currentCorner[1]))
                     {
-                        case "Quarry": { if (currentTile.getTag().Equals("hill")) { return true; } else { val = false; } break; }
-                        case "Logging Camp": { if (currentTile.getTag().Equals("forest")) { return true; } else { val = false; } break; }
-                        case "Wheat": { if (currentTile.getTag().Equals("hill") || currentTile.getTag().Equals("forest") || currentTile.getTag().Equals("river")) { return false; } break; }
-                        case "Rye": { if (currentTile.getTag().Equals("hill") || currentTile.getTag().Equals("forest") || currentTile.getTag().Equals("river")) { return false; } break; }
-                        case "Corn": { if (currentTile.getTag().Equals("hill") || currentTile.getTag().Equals("forest") || currentTile.getTag().Equals("river")) { return false; } break; }
+                        Tile currentTile = constructor.getTile(buildCursor.coords[0] + i + currentCorner[0], buildCursor.coords[1] + j + currentCorner[1]);
+                        switch (buildAction)
+                        {
+                            case "Quarry": { if (currentTile.getTag().Equals("hill")) { return true; } else { val = false; } break; }
+                            case "Logging Camp": { if (currentTile.getTag().Equals("forest")) { return true; } else { val = false; } break; }
+                            case "Wheat": { if (currentTile.getTag().Equals("hill") || currentTile.getTag().Equals("forest") || currentTile.getTag().Equals("river")) { return false; } break; }
+                            case "Rye": { if (currentTile.getTag().Equals("hill") || currentTile.getTag().Equals("forest") || currentTile.getTag().Equals("river")) { return false; } break; }
+                            case "Corn": { if (currentTile.getTag().Equals("hill") || currentTile.getTag().Equals("forest") || currentTile.getTag().Equals("river")) { return false; } break; }
 
+                        }
                     }
                 }
             }
             return val;
+        }
+        public bool checkOverlap() 
+        {
+            foreach (Structure structure in structures) { if (structure.collides(new Rectangle((buildCursor.coords[0] + currentCorner[0]) * tileWidth, (buildCursor.coords[1] + currentCorner[1])*tileHeight, tileWidth * buildCursor.getDimensions()[0], tileHeight * buildCursor.getDimensions()[1]))) { return true; }; }
+            foreach (City block in blocks) { if (block.collides(new Rectangle((buildCursor.coords[0] + currentCorner[0]) * tileWidth, (buildCursor.coords[1] + currentCorner[1])*tileHeight, tileWidth * buildCursor.getDimensions()[0], tileHeight * buildCursor.getDimensions()[1]))) { return true; }; }
+            return false;
         }
 
         public Tile getTile(int x, int y) { return constructor.getTile(x, y); }
