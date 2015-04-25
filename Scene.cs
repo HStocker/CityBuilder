@@ -39,6 +39,7 @@ namespace City_Builder
         private int pauseUpdate = 128;
         private int escapeUpdate = 128;
         private int selectUpdate = 128;
+        private int tabUpdate = 128;
 
         //indices
         private int framePerMove = 6;
@@ -73,6 +74,8 @@ namespace City_Builder
             //test blocks
             blocks.Add(new City(new int[2] { 20, 20 }, "Starter Block", this));
             units.Add(new Unit(new int[2] { 10, 20 }, "Emma", this));
+            units.Add(new Unit(new int[2] { 15, 23 }, "Tony", this));
+            units.Add(new Unit(new int[2] { 6, 20 }, "Salamander", this));
 
             ui = new UI(ingame.GraphicsDevice.Viewport.Width);
             ui.setLocationRectangle(new Rectangle(ingame.GraphicsDevice.Viewport.Width - 240, 0, 240, 800));
@@ -82,7 +85,7 @@ namespace City_Builder
             output18 = ingame.Content.Load<SpriteFont>("Output18pt");
             output12 = ingame.Content.Load<SpriteFont>("Output12pt");
 
-            menu = new ingameMenu(ingame, output12);
+            menu = new ingameMenu(ingame, output12, this);
 
             screenHeight = ingame.GraphicsDevice.Viewport.Height;
             screenWidth = ingame.GraphicsDevice.Viewport.Width;
@@ -106,6 +109,7 @@ namespace City_Builder
             pauseUpdate += gameTime.ElapsedGameTime.Milliseconds;
             escapeUpdate += gameTime.ElapsedGameTime.Milliseconds;
             selectUpdate += gameTime.ElapsedGameTime.Milliseconds;
+            tabUpdate += gameTime.ElapsedGameTime.Milliseconds;
 
 
             switch (controller)
@@ -115,7 +119,7 @@ namespace City_Builder
                         cursor.coords = new int[] { (screenTileWidth - 15) / 2, screenTileHeight / 2 };
                         this.moving();
                         foreach (City block in blocks) { block.update(gameTime); }
-                        foreach (Unit unit in units) { unit.update(gameTime); }
+                        foreach (Unit unit in units) { unit.update(gameTime); unit.reset(); selectIndex = 0; }
                         foreach (Structure structure in structures) { structure.update(gameTime); }
                         break;
                     }
@@ -355,6 +359,7 @@ namespace City_Builder
                 }
             }
 
+            if (tabUpdate >= 128 && state.IsKeyDown(Keys.Tab)) { var property = selection.getTag(); int index = units.FindIndex((unit => unit.getTag() == property)); if (index >= units.Count-1) { index = -1; } selection = units[index += 1]; tabUpdate = 0; }
             if (escapeUpdate >= 128 && state.IsKeyDown(Keys.Escape)) { selection.reset(); escapeUpdate = 0; selectIndex = 0; controller = "moving"; this.togglePause(); }
             if (pauseUpdate >= 128 && state.IsKeyDown(Keys.Space)) { selection.reset(); pauseUpdate = 0; selectIndex = 0; controller = "paused"; }
         }
@@ -414,12 +419,19 @@ namespace City_Builder
 
                 }
                 if (state.IsKeyDown(Keys.Enter)) 
-                { 
-                    structures.Add(new Structure(buildCursor.coords, buildCursor.getDimensions(), buildAction, this)); 
+                {
+                    int[] absoluteCoords = new int[] { buildCursor.coords[0] + currentCorner[0], buildCursor.coords[1] + currentCorner[1] };
+                    structures.Add(new Structure(absoluteCoords, buildCursor.getDimensions(), buildAction, this)); 
                     controller = "moving";
                     selectedUnit = (Unit)selection;
                     selectedUnit.setAction("Move");
-                    selectedUnit.setDestination(buildCursor.coords[0], buildCursor.coords[1]);
+                    selectedUnit.setDestination(absoluteCoords);
+                    exitSelecting();
+                    //initiate selection profession
+                    //start item hauling timer
+                    //haul a maximum of 15 items
+                    //once full, bring them back to city
+                    //increase city inventory
 
                     this.togglePause(); 
                 }
@@ -427,8 +439,12 @@ namespace City_Builder
                 if (escapeUpdate >= 128 && state.IsKeyDown(Keys.Escape)) { escapeUpdate = 0; controller = "selecting"; }
             }
         }
-
-        public bool validBuildSpot(int[] coordinate) { foreach (Structure structure in structures) { if (!structure.finished && coordinate[0] == structure.coords[0] && coordinate[1] == structure.coords[1]) { selectedUnit.setCurrentProject(structure); return true; } } return false; }
+        public void exitSelecting()
+        {
+            selection = null;
+            selectedUnit = null;
+        }
+        public bool validBuildSpot(Unit unit, int[] coordinate) { foreach (Structure structure in structures) { if (!structure.finished && coordinate[0] == structure.coords[0] && coordinate[1] == structure.coords[1]) { unit.setCurrentProject(structure);  return true; } } return false; }
         public void startBuilding(string build)
         {
             controller = "building";
@@ -437,8 +453,6 @@ namespace City_Builder
             //set to 0 in order to avoid recognition in the first few frames of building()
             moveUpdate = 0;
 
-            //!!!test building sprites
-            //change location and dimensions when you get around to building them
             switch (build)
             {
                 case "Quarry": 
@@ -476,6 +490,20 @@ namespace City_Builder
                         buildCursor.setDimensions(3, 2);
                         break;
                     }
+                case "Potato":
+                    {
+                        buildCursor.setSpriteRectangle(new Rectangle(128, 0, 47, 39));
+                        buildCursor.setInvalidRectangle(new Rectangle(175, 0, 47, 39));
+                        buildCursor.setDimensions(3, 2);
+                        break;
+                    }
+                case "Strawberry":
+                    {
+                        buildCursor.setSpriteRectangle(new Rectangle(128, 0, 47, 39));
+                        buildCursor.setInvalidRectangle(new Rectangle(175, 0, 47, 39));
+                        buildCursor.setDimensions(3, 2);
+                        break;
+                    }
                 default: { break; }
             }
         }
@@ -495,10 +523,7 @@ namespace City_Builder
                         {
                             case "Quarry": { if (currentTile.getTag().Equals("hill")) { return true; } else { val = false; } break; }
                             case "Logging Camp": { if (currentTile.getTag().Equals("forest")) { return true; } else { val = false; } break; }
-                            case "Wheat": { if (currentTile.getTag().Equals("hill") || currentTile.getTag().Equals("forest") || currentTile.getTag().Equals("river")) { return false; } break; }
-                            case "Rye": { if (currentTile.getTag().Equals("hill") || currentTile.getTag().Equals("forest") || currentTile.getTag().Equals("river")) { return false; } break; }
-                            case "Corn": { if (currentTile.getTag().Equals("hill") || currentTile.getTag().Equals("forest") || currentTile.getTag().Equals("river")) { return false; } break; }
-
+                            default: { if (currentTile.getTag().Equals("hill") || currentTile.getTag().Equals("forest") || currentTile.getTag().Equals("river")) { return false; } break; }
                         }
                     }
                 }
@@ -520,6 +545,7 @@ namespace City_Builder
         public bool tileOccupied(int[] coords) { foreach (Unit unit in units) { if (unit.coords.Equals(new int[] { coords[0], coords[1] })) { return true; } } return false; }
         public int xCorner() { return currentCorner[0]; }
         public int yCorner() { return currentCorner[1]; }
+        public void addUnit(int x, int y) { units.Add(new Unit(new int[] { x, y }, "NewTest", this)); }
         public void drawTiles()
         {
             for (int i = 0; i < screenTileWidth; i++)
@@ -745,11 +771,12 @@ namespace City_Builder
         KeyboardState keyboard;
         KeyboardState oldkeyboardState;
         SpriteFont output;
+        Scene parent;
 
         string entry = "";
         string outputText = "";
 
-        public ingameMenu(City_Builder ingame, SpriteFont output) { this.ingame = ingame; this.output = output; }
+        public ingameMenu(City_Builder ingame, SpriteFont output, Scene parent) { this.parent = parent; this.ingame = ingame; this.output = output; }
 
 
         public string draw()
@@ -792,6 +819,7 @@ namespace City_Builder
                 case "QUIT": { ingame.Exit(); break; }
                 case "EXIT": { ingame.Exit(); break; }
                 case "MENU": { ingame.changeGameState("initialize"); break; }
+                case "UNIT": { parent.addUnit(Convert.ToInt16(key[1]), Convert.ToInt16(key[2])); break; }
                 default: { outputText += "\n<" + command + ">" + "\nI do not recognize your command: '" + command.Split(' ')[0] + "' \n-- Please type 'help' for a list of accepted commands."; break; }
             }
         }

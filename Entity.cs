@@ -13,7 +13,7 @@ namespace City_Builder
     class Unit : Selectable
     {
         Queue<Tile> path = new Queue<Tile>();
-        Random rand = new Random();
+        Random rand = new Random(Guid.NewGuid().GetHashCode());
         string[] buildings = new string[] { "Quarry", "Logging Camp", "Wheat", "Rye", "Corn", "Potato", "Strawberry" }; 
         Stack<int[]> workStack = new Stack<int[]>();
         Structure currentProject;
@@ -24,13 +24,13 @@ namespace City_Builder
         int moveTimer = 64;
         int buildTimer = 0;
         int idleTimer = 5000;
-        int idleRadius = 10;
+        int idleRadius = 3;
         int[] idleCenter;
 
-        int happiness = 7;
-        int woodCutting = 2;
+        int happiness = 1;
+        int woodCutting = 1;
         int mining = 1;
-        int farming = 3;
+        int farming = 1;
 
         public Unit(int[] coords, string inTag, Scene scene)
         {
@@ -40,7 +40,7 @@ namespace City_Builder
             this.destination = parent.getTile(coords);
             this.setSpriteRectangle(new Rectangle(64, 0, 16, 20));
             this.contructInfo();
-            currentAction = "Dance";
+            currentAction = "Idle";
 
             choiceTree.Add("Root", new string[] { "Move", "Build", "Idle", "Dance" });
             choiceTree.Add("Build", new string[] { "Quarry", "Logging Camp", "Farm" });
@@ -50,10 +50,10 @@ namespace City_Builder
         }
         public void setDestination(int x, int y)
         {
-            if (coords[0] != destination.getCoords()[0] && coords[1] != destination.getCoords()[1]) { workStack.Push(new int[] {destination.coords[0],destination.coords[1]}); }
+            if (coords[0] != destination.getCoords()[0] && coords[1] != destination.getCoords()[1] && previousAction != "Idle") { workStack.Push(new int[] { destination.coords[0], destination.coords[1] }); }
             path.Clear();
             destination = parent.getTile(x,y);
-            Tile current = parent.getTile(coords[0],coords[1]);
+            Tile current = parent.getTile(coords);
             List<Tile> closedSet = new List<Tile>();
             PrioQueue openSet = new PrioQueue();
 
@@ -82,10 +82,10 @@ namespace City_Builder
 
         public void setDestination(int[] y)
         {
-            if (coords[0] != destination.getCoords()[0] && coords[1] != destination.getCoords()[1]) { workStack.Push(destination.coords); }
+            if (coords[0] != destination.getCoords()[0] && coords[1] != destination.getCoords()[1] && previousAction != "Idle") { workStack.Push(destination.coords); }
             path.Clear();
             destination = parent.getTile(y);
-            Tile current = parent.getTile(coords[0], coords[1]);
+            Tile current = parent.getTile(coords);
             List<Tile> closedSet = new List<Tile>();
             PrioQueue openSet = new PrioQueue();
 
@@ -97,10 +97,10 @@ namespace City_Builder
 
                 Tile old = current;
 
-                if (parent.tileExists(current.getCoords()[0] + 1, current.getCoords()[1]) && !closedSet.Contains(parent.getTile(current.getCoords()[0] + 1, current.getCoords()[1])) && parent.getTile(current.getCoords()[0] + 1, current.getCoords()[1]).getNum() != 4) { openSet.Enqueue(parent.getTile(current.getCoords()[0] + 1, current.getCoords()[1]), manhattanDistance(parent.getTile(current.getCoords()[0] + 1, current.getCoords()[1]), destination)); }
-                if (parent.tileExists(current.getCoords()[0], current.getCoords()[1] + 1) && !closedSet.Contains(parent.getTile(current.getCoords()[0], current.getCoords()[1] + 1)) && parent.getTile(current.getCoords()[0], current.getCoords()[1] + 1).getNum() != 4) { openSet.Enqueue(parent.getTile(current.getCoords()[0], current.getCoords()[1] + 1), manhattanDistance(parent.getTile(current.getCoords()[0], current.getCoords()[1] + 1), destination)); }
-                if (parent.tileExists(current.getCoords()[0] - 1, current.getCoords()[1]) && !closedSet.Contains(parent.getTile(current.getCoords()[0] - 1, current.getCoords()[1])) && parent.getTile(current.getCoords()[0] - 1, current.getCoords()[1]).getNum() != 4) { openSet.Enqueue(parent.getTile(current.getCoords()[0] - 1, current.getCoords()[1]), manhattanDistance(parent.getTile(current.getCoords()[0] - 1, current.getCoords()[1]), destination)); }
-                if (parent.tileExists(current.getCoords()[0], current.getCoords()[1] - 1) && !closedSet.Contains(parent.getTile(current.getCoords()[0], current.getCoords()[1] - 1)) && parent.getTile(current.getCoords()[0], current.getCoords()[1] - 1).getNum() != 4) { openSet.Enqueue(parent.getTile(current.getCoords()[0], current.getCoords()[1] - 1), manhattanDistance(parent.getTile(current.getCoords()[0], current.getCoords()[1] - 1), destination)); }
+                if (parent.tileExists(current.getCoords()[0] + 1, current.getCoords()[1]) && !closedSet.Contains(parent.getTile(current.getCoords()[0] + 1, current.getCoords()[1])) && parent.getTile(current.getCoords()[0] + 1, current.getCoords()[1]).getNum() != 0) { openSet.Enqueue(parent.getTile(current.getCoords()[0] + 1, current.getCoords()[1]), manhattanDistance(parent.getTile(current.getCoords()[0] + 1, current.getCoords()[1]), destination)); }
+                if (parent.tileExists(current.getCoords()[0], current.getCoords()[1] + 1) && !closedSet.Contains(parent.getTile(current.getCoords()[0], current.getCoords()[1] + 1)) && parent.getTile(current.getCoords()[0], current.getCoords()[1] + 1).getNum() != 0) { openSet.Enqueue(parent.getTile(current.getCoords()[0], current.getCoords()[1] + 1), manhattanDistance(parent.getTile(current.getCoords()[0], current.getCoords()[1] + 1), destination)); }
+                if (parent.tileExists(current.getCoords()[0] - 1, current.getCoords()[1]) && !closedSet.Contains(parent.getTile(current.getCoords()[0] - 1, current.getCoords()[1])) && parent.getTile(current.getCoords()[0] - 1, current.getCoords()[1]).getNum() != 0) { openSet.Enqueue(parent.getTile(current.getCoords()[0] - 1, current.getCoords()[1]), manhattanDistance(parent.getTile(current.getCoords()[0] - 1, current.getCoords()[1]), destination)); }
+                if (parent.tileExists(current.getCoords()[0], current.getCoords()[1] - 1) && !closedSet.Contains(parent.getTile(current.getCoords()[0], current.getCoords()[1] - 1)) && parent.getTile(current.getCoords()[0], current.getCoords()[1] - 1).getNum() != 0) { openSet.Enqueue(parent.getTile(current.getCoords()[0], current.getCoords()[1] - 1), manhattanDistance(parent.getTile(current.getCoords()[0], current.getCoords()[1] - 1), destination)); }
 
                 closedSet.Add(current);
                 current = (Tile)openSet.Peek();
@@ -125,7 +125,7 @@ namespace City_Builder
 
         public void update(GameTime gameTime)
         {
-            //Debug.Print(currentAction);
+            //Debug.Print(this.tag + ": "+currentAction);
             //this.contructInfo();
             danceTimer += gameTime.ElapsedGameTime.Milliseconds;
             moveTimer += gameTime.ElapsedGameTime.Milliseconds;
@@ -135,7 +135,7 @@ namespace City_Builder
             {
                 case "Nothing":
                     {
-                        if (parent.validBuildSpot(this.coords)) { currentAction = "Build"; }
+                        if (previousAction != "Build" && parent.validBuildSpot(this, this.coords)) { currentAction = "Build"; }
                         else if (path.Count > 0) { currentAction = "Move"; }
                         else if (workStack.Count > 0) { this.setDestination(workStack.Pop()); currentAction = "Move"; }
                         break;
@@ -179,9 +179,11 @@ namespace City_Builder
                     }
                 case "Build":
                     {
+                        previousAction = "Build";
                         buildTimer += gameTime.ElapsedGameTime.Milliseconds;
                         if (buildTimer > 5000)
                         {
+                            Debug.Print(this.tag);
                             currentProject.setSpriteRectangle(new Rectangle(222, 0, 47, 39));
                             currentProject.finished = true;
                             currentAction = "Nothing";
@@ -201,7 +203,7 @@ namespace City_Builder
 
         public void move()
         {
-            if (moveTimer > 225)
+            if (moveTimer > 225 && !parent.tileOccupied(path.Peek().coords[0], path.Peek().coords[1]))
             //&& !parent.tileOccupied(path.Peek()[0],path.Peek()[1])
             {
                 moveTimer = 0;
@@ -260,7 +262,11 @@ namespace City_Builder
     }
     class City : Selectable
     {
-
+        int stone = 0;
+        int wood = 0;
+        int food = 0;
+        int population = 0;
+        
         public City(int[] coords, string inTag, Scene scene)
         {
             this.parent = scene;
@@ -268,13 +274,22 @@ namespace City_Builder
             this.coords = coords;
             this.setSpriteRectangle(new Rectangle(0, 220, 80, 100));
             this.setLocationRectangle(new Rectangle(coords[0] * 16, coords[1] * 20, 5 * 16, 5 * 20));
-
-            this.info = "Put information here\ntesting size\nHAPPINESS:\n[X|X|X| | | | |]";
             choiceTree.Add("Root", new string[] { "Build", "Free", "Dance" });
             choiceTree.Add("Build", new string[] { "Quarry", "Logging Camp", "Farm" });
             this.options = choiceTree["Root"];
         }
         public void update(GameTime gameTime) { }
+        public void contructInfo()
+        {
+            this.info = "";
+            this.info += String.Format("STONE: {0:D5}  WOOD: {1:D5}\nFOOD:  {2:D5}  POP:  {3:D5}", stone, wood, food, population);
+
+        }
+        public override string getInfo()
+        {
+            this.contructInfo();
+            return base.getInfo();
+        }
     }
 
 
@@ -292,7 +307,7 @@ namespace City_Builder
         public virtual void checkStateChange() { }
         public void setAction(string action) { this.currentAction = action; }
         public bool hasChildren(string key) { return choiceTree.ContainsKey(key); }
-        public void reset() { this.options = choiceTree["Root"]; }
+        public void reset() { this.setIndex("Root");  }
         public virtual string getInfo() { return this.info; }
     }
 
@@ -324,7 +339,6 @@ namespace City_Builder
         }
         public bool collides(Rectangle other)
         {
-            Debug.Print(Convert.ToString(this.locationRectangle) + " " + Convert.ToString(other));
             return this.locationRectangle.Intersects(other);
         }
     }
@@ -412,8 +426,8 @@ namespace City_Builder
  * display information on the bottom
  * change the screen height to fit
  * Current Action:  whatever
- * HAPPINESS:                               WOOD:             PICTURE_____
- *[XXXXXXXXXXX]                            [XXXXXXXXXXXX]           /     \
+ * HAPPINESS:                               WOOD:             PICTURE/v^^\
+ *[XXXXXXXXXXX]                            [XXXXXXXXXXXX]           v^^^V^V
  * MINING:                                  FARMING:                | 0 0 |
  *[XXXXXXXXXXX]                            [XXXXXXXXXXXX]           \ --- /
  *                                                                   VVVVV       
