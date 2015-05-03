@@ -21,6 +21,7 @@ namespace City_Builder
         Cursor cursor;
         Cursor buildCursor;
         KeyboardState state;
+        List<Selectable> selectOverlap = new List<Selectable>();
 
         //pixels
         int screenHeight;
@@ -44,11 +45,11 @@ namespace City_Builder
         //indices
         private int framePerMove = 6;
         private int moveMod = 1;
-        private int selectIndex = 1;
+        private int selectIndex = 0;
 
         //misc 
         bool pause = false;
-        string controller = "moving";
+        public string controller = "moving";
         string currentIndex = "Root";
         string buildAction;
         Stack<string> selectionStack = new Stack<string>();
@@ -73,9 +74,9 @@ namespace City_Builder
 
             //test blocks
             blocks.Add(new City(new int[2] { 20, 20 }, "Starter Block", this));
-            units.Add(new Unit(new int[2] { 10, 20 }, "Emma", this));
-            units.Add(new Unit(new int[2] { 15, 23 }, "Tony", this));
-            units.Add(new Unit(new int[2] { 6, 20 }, "Salamander", this));
+            units.Add(new Unit(new int[2] { 10, 20 }, "Emma", blocks[0], this));
+            //units.Add(new Unit(new int[2] { 15, 23 }, "Tony", blocks[0], this));
+            //units.Add(new Unit(new int[2] { 6, 20 }, "Salamander", blocks[0], this));
 
             ui = new UI(ingame.GraphicsDevice.Viewport.Width);
             ui.setLocationRectangle(new Rectangle(ingame.GraphicsDevice.Viewport.Width - 240, 0, 240, 800));
@@ -320,10 +321,13 @@ namespace City_Builder
                 }
 
                 selection = null;
-                foreach (Unit unit in units) { if (cursor.coords[0] + currentCorner[0] == unit.coords[0] && cursor.coords[1] + currentCorner[1] == unit.coords[1]) { ui.display(unit); selection = unit; } }
-                foreach (City block in blocks) { if ((cursor.coords[0] + currentCorner[0] >= block.coords[0] && cursor.coords[0] + currentCorner[0] <= block.coords[0] + 4) && (cursor.coords[1] + currentCorner[1] >= block.coords[1] && cursor.coords[1] + currentCorner[1] <= block.coords[1] + 4)) { ui.display(block); selection = block; } }
-                if (selection != null && state.IsKeyDown(Keys.Enter)) { controller = "selecting"; selectUpdate = 0; }
-
+                selectOverlap.Clear();
+                foreach (Unit unit in units) { if (cursor.coords[0] + currentCorner[0] == unit.coords[0] && cursor.coords[1] + currentCorner[1] == unit.coords[1]) { ui.display(unit); selectOverlap.Add(unit); } }
+                foreach (City block in blocks) { if ((cursor.coords[0] + currentCorner[0] >= block.coords[0] && cursor.coords[0] + currentCorner[0] <= block.coords[0] + 4) && (cursor.coords[1] + currentCorner[1] >= block.coords[1] && cursor.coords[1] + currentCorner[1] <= block.coords[1] + 4)) { ui.display(block); selectOverlap.Add(block); } }
+                foreach (Structure structure in structures) { if ((cursor.coords[0] + currentCorner[0] >= structure.coords[0] && cursor.coords[0] + currentCorner[0] <= structure.coords[0] + 3) && (cursor.coords[1] + currentCorner[1] >= structure.coords[1] && cursor.coords[1] + currentCorner[1] <= structure.coords[1] + 2)) { ui.display(structure); selectOverlap.Add(structure); } }
+                if (tabUpdate >= 128 && state.IsKeyDown(Keys.Tab)) { if (selectIndex >= selectOverlap.Count) { selectIndex = 0; } else { selectIndex++; } tabUpdate = 0; }
+                if (selectOverlap.Count > 0) { selection = selectOverlap[selectIndex]; }
+                if (selection != null && state.IsKeyDown(Keys.Enter)) { controller = "selecting"; selectUpdate = 0; selectIndex = 0; }
                 if (pauseUpdate >= 128 && state.IsKeyDown(Keys.Space)) { pauseUpdate = 0; this.togglePause(); controller = "moving"; }
                 if (escapeUpdate >= 128 && state.IsKeyDown(Keys.Escape)) { escapeUpdate = 0; this.togglePause(); controller = "moving"; }
             }
@@ -418,14 +422,15 @@ namespace City_Builder
                     if (currentCorner[1] > constructor.getDimensions()[1] - screenTileHeight) { currentCorner[1] = constructor.getDimensions()[1] - screenTileHeight; }
 
                 }
-                if (state.IsKeyDown(Keys.Enter)) 
+                if (isValidBuilding() && state.IsKeyDown(Keys.Enter)) 
                 {
                     int[] absoluteCoords = new int[] { buildCursor.coords[0] + currentCorner[0], buildCursor.coords[1] + currentCorner[1] };
-                    structures.Add(new Structure(absoluteCoords, buildCursor.getDimensions(), buildAction, this)); 
+                    Structure tempStructure = new Structure(absoluteCoords, buildCursor.getDimensions(), buildAction, this);
+                    structures.Add(tempStructure); 
                     controller = "moving";
                     selectedUnit = (Unit)selection;
-                    selectedUnit.setAction("Move");
-                    selectedUnit.setDestination(absoluteCoords);
+                    selectedUnit.setBuilding(tempStructure);
+                    selectedUnit.setAction("Load");
                     exitSelecting();
                     //initiate selection profession
                     //start item hauling timer
@@ -444,7 +449,7 @@ namespace City_Builder
             selection = null;
             selectedUnit = null;
         }
-        public bool validBuildSpot(Unit unit, int[] coordinate) { foreach (Structure structure in structures) { if (!structure.finished && coordinate[0] == structure.coords[0] && coordinate[1] == structure.coords[1]) { unit.setCurrentProject(structure);  return true; } } return false; }
+        public bool validBuildSpot(Unit unit, int[] coordinate) { foreach (Structure structure in structures) { if (!structure.finished && coordinate[0] == structure.coords[0] && coordinate[1] == structure.coords[1]) { return true; } } return false; }
         public void startBuilding(string build)
         {
             controller = "building";
@@ -545,7 +550,7 @@ namespace City_Builder
         public bool tileOccupied(int[] coords) { foreach (Unit unit in units) { if (unit.coords.Equals(new int[] { coords[0], coords[1] })) { return true; } } return false; }
         public int xCorner() { return currentCorner[0]; }
         public int yCorner() { return currentCorner[1]; }
-        public void addUnit(int x, int y) { units.Add(new Unit(new int[] { x, y }, "NewTest", this)); }
+        public void addUnit(int x, int y, string name) { units.Add(new Unit(new int[] { x, y }, name, blocks[0], this)); }
         public void drawTiles()
         {
             for (int i = 0; i < screenTileWidth; i++)
@@ -691,7 +696,9 @@ namespace City_Builder
 
         public Tile getTile(int x, int y)
         {
+            
             return tileArray[x, y];
+            
         }
 
     }
@@ -819,7 +826,8 @@ namespace City_Builder
                 case "QUIT": { ingame.Exit(); break; }
                 case "EXIT": { ingame.Exit(); break; }
                 case "MENU": { ingame.changeGameState("initialize"); break; }
-                case "UNIT": { parent.addUnit(Convert.ToInt16(key[1]), Convert.ToInt16(key[2])); break; }
+                case "UNIT": { parent.addUnit(Convert.ToInt16(key[1]), Convert.ToInt16(key[2]), key[3]); break; }
+                case "MODE": { outputText += "\n<" + command + ">" + "\nThe current game mode is: "+parent.controller; break; }
                 default: { outputText += "\n<" + command + ">" + "\nI do not recognize your command: '" + command.Split(' ')[0] + "' \n-- Please type 'help' for a list of accepted commands."; break; }
             }
         }
